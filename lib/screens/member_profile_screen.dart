@@ -32,23 +32,36 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token') ?? '';
 
-      // Fetch Profile
-      final profileResponse = await http.get(
-        Uri.parse('${ApiConstants.memberProfile}?id=${widget.memberId}'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
+      // Fetch both profile and payments in parallel for faster loading
+      final responses = await Future.wait([
+        http
+            .get(
+              Uri.parse('${ApiConstants.memberProfile}?id=${widget.memberId}'),
+              headers: {'Authorization': 'Bearer $token'},
+            )
+            .timeout(ApiConstants.timeout),
+        http
+            .get(
+              Uri.parse(
+                '${ApiConstants.memberPayments}?member_id=${widget.memberId}',
+              ),
+              headers: {'Authorization': 'Bearer $token'},
+            )
+            .timeout(ApiConstants.timeout),
+      ]);
 
-      // Fetch Payments
-      final paymentsResponse = await http.get(
-        Uri.parse('${ApiConstants.memberPayments}?member_id=${widget.memberId}'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
+      final profileResponse = responses[0];
+      final paymentsResponse = responses[1];
 
-      if (profileResponse.statusCode == 200 && paymentsResponse.statusCode == 200) {
+      if (profileResponse.statusCode == 200 &&
+          paymentsResponse.statusCode == 200) {
         final pData = json.decode(profileResponse.body);
         final pyData = json.decode(paymentsResponse.body);
 
         if (pData['status'] == 'success') {
+          // Debug: Print photo URL
+          print('📸 Member Photo URL: ${pData['member']['photo']}');
+
           setState(() {
             _memberData = pData['member'];
             _payments = pyData['payments'] ?? [];
@@ -57,9 +70,11 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
         }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading profile: $e')),
-      );
+      if (!mounted) return;
+      print('❌ Profile Error: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error loading profile: $e')));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -100,8 +115,8 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _memberData == null
-              ? const Center(child: Text('Profile not found'))
-              : _buildProfileContent(),
+          ? const Center(child: Text('Profile not found'))
+          : _buildProfileContent(),
     );
   }
 
@@ -123,14 +138,30 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
             child: (photoUrl != null && photoUrl.toString().isNotEmpty)
                 ? CachedNetworkImage(
                     imageUrl: photoUrl,
+                    memCacheHeight: 240,
+                    memCacheWidth: 240,
+                    fadeInDuration: const Duration(milliseconds: 300),
+                    fadeOutDuration: const Duration(milliseconds: 300),
                     imageBuilder: (context, imageProvider) => Container(
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        image: DecorationImage(image: imageProvider, fit: BoxFit.cover),
+                        image: DecorationImage(
+                          image: imageProvider,
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
-                    placeholder: (context, url) => const CircularProgressIndicator(strokeWidth: 2),
-                    errorWidget: (context, url, error) => const Icon(Icons.person, size: 60, color: Colors.blue),
+                    placeholder: (context, url) => Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.grey.shade200,
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.person, size: 40, color: Colors.grey),
+                      ),
+                    ),
+                    errorWidget: (context, url, error) =>
+                        const Icon(Icons.person, size: 60, color: Colors.blue),
                   )
                 : const Icon(Icons.person, size: 60, color: Colors.blue),
           ),
@@ -139,7 +170,11 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
           // Name and Phone
           Text(
             _memberData!['name'] ?? 'Unknown',
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black),
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
@@ -152,10 +187,17 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Join Date', style: TextStyle(fontSize: 16, color: Colors.black)),
+              const Text(
+                'Join Date',
+                style: TextStyle(fontSize: 16, color: Colors.black),
+              ),
               Text(
                 joinDate,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
               ),
             ],
           ),
@@ -163,7 +205,10 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Remaining Days', style: TextStyle(fontSize: 16, color: Colors.black)),
+              const Text(
+                'Remaining Days',
+                style: TextStyle(fontSize: 16, color: Colors.black),
+              ),
               Text(
                 remainingDays,
                 style: TextStyle(
@@ -191,7 +236,10 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
           const SizedBox(height: 16),
 
           if (_payments.isEmpty)
-            const Text('No payment history found', style: TextStyle(color: Colors.grey))
+            const Text(
+              'No payment history found',
+              style: TextStyle(color: Colors.grey),
+            )
           else
             ..._payments.map((payment) => _buildPaymentCard(payment)),
         ],
@@ -201,7 +249,8 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
 
   Widget _buildPaymentCard(dynamic payment) {
     final month = payment['month'] ?? 'Unknown';
-    final amount = double.tryParse(payment['total_amount']?.toString() ?? '0') ?? 0;
+    final amount =
+        double.tryParse(payment['total_amount']?.toString() ?? '0') ?? 0;
     final date = _formatDate(payment['paid_date']);
 
     return Container(

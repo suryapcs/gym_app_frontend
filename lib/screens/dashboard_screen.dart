@@ -45,7 +45,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).timeout(ApiConstants.timeout);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -81,7 +81,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         backgroundColor: const Color(0xFF2196F3),
         elevation: 0,
         title: const Text(
-          'FITPRO GYM',
+          'VETTRI GYM',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             letterSpacing: 1.2,

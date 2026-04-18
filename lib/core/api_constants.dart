@@ -1,8 +1,9 @@
 class ApiConstants {
-  // Using 10.0.2.2 for Android Emulator connecting to WAMP server.
-  // Change to your machine's IP (e.g., 192.168.1.X) if testing on a real device.
-  // Change to localhost if using web.
+  // ✅ Production server URL
   static const String baseUrl = 'https://pcstech.in/gym_api';
+
+  // Timeout duration for all API requests
+  static const Duration timeout = Duration(seconds: 15);
 
   static const String login = '$baseUrl/login.php';
   static const String register = '$baseUrl/register.php';

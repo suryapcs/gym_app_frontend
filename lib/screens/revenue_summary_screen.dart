@@ -59,7 +59,65 @@ class _RevenueSummaryScreenState extends State<RevenueSummaryScreen> {
     }
   }
 
+  bool _validateInput() {
+    // Check if all fields are empty
+    if (_trainerController.text.isEmpty &&
+        _electricityController.text.isEmpty &&
+        _maintenanceController.text.isEmpty &&
+        _equipmentController.text.isEmpty &&
+        _otherController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter at least one expense value'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return false;
+    }
+
+    // Validate that all entered values are valid numbers
+    final fields = [
+      ('Trainer Fee', _trainerController.text),
+      ('Electricity Fee', _electricityController.text),
+      ('Maintenance Fee', _maintenanceController.text),
+      ('Equipment Cost', _equipmentController.text),
+      ('Other Expenses', _otherController.text),
+    ];
+
+    for (var field in fields) {
+      if (field.$2.isNotEmpty) {
+        try {
+          final value = double.parse(field.$2);
+          if (value < 0) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('${field.$1} cannot be negative'),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+            return false;
+          }
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${field.$1} must be a valid number'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
   Future<void> _saveRevenue() async {
+    // Validate input before saving
+    if (!_validateInput()) {
+      return;
+    }
+
     setState(() => _isSaving = true);
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -93,27 +151,34 @@ class _RevenueSummaryScreenState extends State<RevenueSummaryScreen> {
       final result = json.decode(response.body);
 
       if (response.statusCode == 200 && result['status'] == 'success') {
-        setState(() {
-          _totalIncome = (result['total_income'] ?? 0).toDouble();
-          _closingBalance = (result['closing_balance'] ?? 0).toDouble();
-        });
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Revenue summary saved successfully!')),
+          const SnackBar(
+            content: Text('Revenue summary saved successfully!'),
+            duration: Duration(seconds: 1),
+          ),
         );
+        // Navigate back to dashboard after a brief delay
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (!mounted) return;
+        Navigator.of(context).pop();
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(result['message'] ?? 'Failed to save summary'),
+            duration: const Duration(seconds: 2),
           ),
         );
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error saving revenue: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error saving revenue: $e'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }

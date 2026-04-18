@@ -101,20 +101,20 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'FITPRO GYM',
+                      'VETTRI GYM',
                       textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                            letterSpacing: 3,
-                          ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.displayLarge?.copyWith(letterSpacing: 3),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Unleash Your Inner Beast',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppTheme.primaryColor,
-                            letterSpacing: 1.5,
-                          ),
+                        color: AppTheme.primaryColor,
+                        letterSpacing: 1.5,
+                      ),
                     ),
                     const SizedBox(height: 64),
                     // Form

@@ -5,15 +5,15 @@ import 'screens/dashboard_screen.dart';
 import 'services/auth_service.dart';
 
 void main() {
-  runApp(const FitProGymApp());
+  runApp(const VettriGymApp());
 }
 
-class FitProGymApp extends StatelessWidget {
-  const FitProGymApp({super.key});
+class VettriGymApp extends StatelessWidget {
+  const VettriGymApp({super.key});
 
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'FitPro Gym',
+      title: 'vettri Gym',
       theme: AppTheme.darkTheme,
       debugShowCheckedModeBanner: false,
       home: const AuthCheck(),
@@ -52,11 +52,7 @@ class _AuthCheckState extends State<AuthCheck> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     return _isLoggedIn ? const DashboardScreen() : const LoginScreen();
   }

@@ -48,7 +48,7 @@ class _AddPaymentScreenState extends State<AddPaymentScreen> {
           'amount': _amountController.text,
           'note': _noteController.text,
         },
-      );
+      ).timeout(ApiConstants.timeout);
 
       final result = json.decode(response.body);
 

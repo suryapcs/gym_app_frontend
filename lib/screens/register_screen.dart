@@ -49,11 +49,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         // Auto-login after successful registration
         final loginSuccess = await _authService.login(email, password);
         if (!mounted) return;
-        
+
         if (loginSuccess) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Registration Successful! Welcome to FitPro Gym.'),
+              content: Text('Registration Successful! Welcome to vettri Gym.'),
               backgroundColor: AppTheme.primaryColor,
               behavior: SnackBarBehavior.floating,
             ),
@@ -94,9 +94,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('JOIN FITPRO GYM'),
-      ),
+      appBar: AppBar(title: const Text('JOIN VETTRI GYM')),
       body: Stack(
         children: [
           // Background pattern
@@ -122,7 +120,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 16.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32.0,
+                  vertical: 16.0,
+                ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -130,9 +131,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     Text(
                       'START YOUR\nJOURNEY',
                       textAlign: TextAlign.left,
-                      style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                            height: 1.2,
-                          ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.displayMedium?.copyWith(height: 1.2),
                     ),
                     const SizedBox(height: 8),
                     Text(

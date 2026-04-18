@@ -33,13 +33,15 @@ class _MemberListScreenState extends State<MemberListScreen> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token') ?? '';
 
-      final response = await http.get(
-        Uri.parse(ApiConstants.membersList),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
+      final response = await http
+          .get(
+            Uri.parse(ApiConstants.membersList),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          )
+          .timeout(ApiConstants.timeout);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -182,6 +184,10 @@ class _MemberListScreenState extends State<MemberListScreen> {
               child: (photoUrl != null && photoUrl.toString().isNotEmpty)
                   ? CachedNetworkImage(
                       imageUrl: photoUrl,
+                      memCacheHeight: 120,
+                      memCacheWidth: 120,
+                      fadeInDuration: const Duration(milliseconds: 300),
+                      fadeOutDuration: const Duration(milliseconds: 300),
                       imageBuilder: (context, imageProvider) => Container(
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
@@ -191,8 +197,19 @@ class _MemberListScreenState extends State<MemberListScreen> {
                           ),
                         ),
                       ),
-                      placeholder: (context, url) =>
-                          const CircularProgressIndicator(strokeWidth: 2),
+                      placeholder: (context, url) => Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.grey.shade200,
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.person,
+                            size: 20,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ),
                       errorWidget: (context, url, error) => const Icon(
                         Icons.person,
                         size: 30,
@@ -203,7 +220,11 @@ class _MemberListScreenState extends State<MemberListScreen> {
             ),
             title: Text(
               name,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.black),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: Colors.black,
+              ),
             ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

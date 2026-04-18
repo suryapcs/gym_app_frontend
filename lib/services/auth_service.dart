@@ -15,7 +15,7 @@ class AuthService {
           'email': email,
           'password': password,
         }),
-      );
+      ).timeout(ApiConstants.timeout);
 
       if (response.statusCode == 200) {
         try {
@@ -40,6 +40,9 @@ class AuthService {
       if (e.toString().contains('Invalid server response')) {
         throw Exception(e.toString().replaceAll('Exception: ', ''));
       }
+      if (e.toString().contains('TimeoutException')) {
+        throw Exception('Connection timed out. Please check your internet connection.');
+      }
       throw Exception('Failed to connect: $e');
     }
   }
@@ -60,7 +63,7 @@ class AuthService {
           'password': password,
           'phone': phone,
         }),
-      );
+      ).timeout(ApiConstants.timeout);
 
       if (response.statusCode == 200) {
         try {
