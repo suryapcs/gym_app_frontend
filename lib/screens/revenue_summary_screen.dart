@@ -328,54 +328,8 @@ class _RevenueSummaryScreenState extends State<RevenueSummaryScreen> {
     );
   }
 
-  // Widget _buildBalanceCard({required String title,
-  //   required double amount,
-  //   bool isHighlight = false,
-  // }) {
-  //   return Container(
-  //     width: double.infinity,
-  //     padding: const EdgeInsets.all(20),
-  //     decoration: BoxDecoration(
-  //       color: const Color(0xFFE3F2FD), // Light blue background
-  //       borderRadius: BorderRadius.circular(20),
-  //       border: Border.all(color: const Color(0xFF90CAF9), width: 1.5),
-  //     ),
-  //     child: Column(
-  //       crossAxisAlignment: CrossAxisAlignment.start,
-  //       children: [
-  //         Text(
-  //           title,
-  //           style: const TextStyle(
-  //             fontSize: 18,
-  //             fontWeight: FontWeight.bold,
-  //             color: Color(0xFF1976D2),
-  //           ),
-  //         ),
-  //         const SizedBox(height: 12),
-  //         Row(
-  //           children: [
-  //             const Text(
-  //               '₹ ',
-  //               style: TextStyle(
-  //                 fontSize: 32,
-  //                 fontWeight: FontWeight.bold,
-  //                 color: Color(0xFF2196F3),
-  //               ),
-  //             ),
-  //             Text(
-  //               amount.toStringAsFixed(2),
-  //               style: const TextStyle(
-  //                 fontSize: 32,
-  //                 fontWeight: FontWeight.bold,
-  //                 color: Color(0xFF2196F3),
-  //               ),
-  //             ),
-  //           ],
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
+
+
 
   Widget _buildExpenseField({
     required String label,

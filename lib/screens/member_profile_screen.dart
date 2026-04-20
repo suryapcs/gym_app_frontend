@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import '../core/api_constants.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'add_payment_screen.dart';
 
 class MemberProfileScreen extends StatefulWidget {
   final int memberId;
@@ -136,32 +136,21 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
             radius: 60,
             backgroundColor: Colors.blue.shade50,
             child: (photoUrl != null && photoUrl.toString().isNotEmpty)
-                ? CachedNetworkImage(
-                    imageUrl: photoUrl,
-                    memCacheHeight: 240,
-                    memCacheWidth: 240,
-                    fadeInDuration: const Duration(milliseconds: 300),
-                    fadeOutDuration: const Duration(milliseconds: 300),
-                    imageBuilder: (context, imageProvider) => Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        image: DecorationImage(
-                          image: imageProvider,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
+                ? ClipOval(
+                    child: Image.network(
+                      photoUrl,
+                      width: 120,
+                      height: 120,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return const Center(
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) =>
+                          const Icon(Icons.person, size: 60, color: Colors.blue),
                     ),
-                    placeholder: (context, url) => Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.grey.shade200,
-                      ),
-                      child: const Center(
-                        child: Icon(Icons.person, size: 40, color: Colors.grey),
-                      ),
-                    ),
-                    errorWidget: (context, url, error) =>
-                        const Icon(Icons.person, size: 60, color: Colors.blue),
                   )
                 : const Icon(Icons.person, size: 60, color: Colors.blue),
           ),
@@ -219,6 +208,43 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 24),
+
+          // Renew button for expired members
+          if (isExpired)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2196F3),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text(
+                  'Renew Membership',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                onPressed: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AddPaymentScreen(
+                        memberId: widget.memberId,
+                        memberName: _memberData!['name'] ?? 'Member',
+                      ),
+                    ),
+                  );
+                  if (result == true) {
+                    _fetchProfileData(); // refresh profile
+                    if (mounted) Navigator.pop(context, true); // refresh list
+                  }
+                },
+              ),
+            ),
           const SizedBox(height: 32),
 
           // Payments Section

@@ -3,7 +3,6 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/api_constants.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'member_profile_screen.dart';
 import 'add_payment_screen.dart';
 
@@ -182,38 +181,24 @@ class _MemberListScreenState extends State<MemberListScreen> {
               radius: 30,
               backgroundColor: Colors.blue.shade50,
               child: (photoUrl != null && photoUrl.toString().isNotEmpty)
-                  ? CachedNetworkImage(
-                      imageUrl: photoUrl,
-                      memCacheHeight: 120,
-                      memCacheWidth: 120,
-                      fadeInDuration: const Duration(milliseconds: 300),
-                      fadeOutDuration: const Duration(milliseconds: 300),
-                      imageBuilder: (context, imageProvider) => Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          image: DecorationImage(
-                            image: imageProvider,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      ),
-                      placeholder: (context, url) => Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.grey.shade200,
-                        ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.person,
-                            size: 20,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ),
-                      errorWidget: (context, url, error) => const Icon(
-                        Icons.person,
-                        size: 30,
-                        color: Colors.blue,
+                  ? ClipOval(
+                      child: Image.network(
+                        photoUrl,
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, progress) {
+                          if (progress == null) return child;
+                          return const Center(
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(Icons.person, size: 30, color: Colors.blue),
                       ),
                     )
                   : const Icon(Icons.person, size: 30, color: Colors.blue),
@@ -277,18 +262,19 @@ class _MemberListScreenState extends State<MemberListScreen> {
                     ),
                   )
                 : null,
-            onTap: isActiveTab
-                ? () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => MemberProfileScreen(
-                          memberId: int.parse(member['id'].toString()),
-                        ),
-                      ),
-                    );
-                  }
-                : null,
+            onTap: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => MemberProfileScreen(
+                    memberId: int.parse(member['id'].toString()),
+                  ),
+                ),
+              );
+              if (result == true) {
+                _fetchMembers();
+              }
+            },
           );
         },
       ),
