@@ -59,7 +59,6 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
         final pyData = json.decode(paymentsResponse.body);
 
         if (pData['status'] == 'success') {
-          // Debug: Print photo URL
           print('📸 Member Photo URL: ${pData['member']['photo']}');
 
           setState(() {
@@ -102,6 +101,237 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
     }
   }
 
+  /// Opens a fullscreen Telegram-style image viewer with Hero animation + pinch-to-zoom.
+  void _openImageViewer(BuildContext context, String imageUrl) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.transparent,
+        pageBuilder: (_, animation, __) {
+          return FadeTransition(
+            opacity: animation,
+            child: _ImageViewerPage(
+              imageUrl: imageUrl,
+              heroTag: 'member_photo_${widget.memberId}',
+              memberName: _memberData?['name'] ?? '',
+            ),
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 300),
+        reverseTransitionDuration: const Duration(milliseconds: 250),
+      ),
+    );
+  }
+
+  /// Opens a bottom sheet to edit member details.
+  void _openEditSheet() {
+    final nameCtrl    = TextEditingController(text: _memberData!['name'] ?? '');
+    final phoneCtrl   = TextEditingController(text: _memberData!['phone'] ?? '');
+    final addressCtrl = TextEditingController(text: _memberData!['address'] ?? '');
+    final formKey     = GlobalKey<FormState>();
+    bool isSaving     = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            Future<void> save() async {
+              if (!formKey.currentState!.validate()) return;
+              setSheetState(() => isSaving = true);
+
+              try {
+                final prefs = await SharedPreferences.getInstance();
+                final token = prefs.getString('token') ?? '';
+
+                final request = http.MultipartRequest(
+                  'POST',
+                  Uri.parse(ApiConstants.updateMember),
+                )
+                  ..headers['Authorization'] = 'Bearer $token'
+                  ..fields['id']      = widget.memberId.toString()
+                  ..fields['name']    = nameCtrl.text.trim()
+                  ..fields['phone']   = phoneCtrl.text.trim()
+                  ..fields['address'] = addressCtrl.text.trim();
+
+                final streamed = await request.send().timeout(ApiConstants.timeout);
+                final body     = await streamed.stream.bytesToString();
+                final data     = json.decode(body);
+
+                if (!ctx.mounted) return;
+
+                if (data['status'] == 'success') {
+                  Navigator.pop(ctx); // close sheet
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('✅ Profile updated successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                  _fetchProfileData(); // refresh
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('❌ ${data['message'] ?? 'Update failed'}'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                  );
+                }
+              } finally {
+                if (ctx.mounted) setSheetState(() => isSaving = false);
+              }
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 24,
+                right: 24,
+                top: 24,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              ),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Row(
+                      children: [
+                        const Icon(Icons.edit_rounded, color: Color(0xFF2196F3)),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'Edit Member',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1A237E),
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          icon: const Icon(Icons.close),
+                          color: Colors.grey,
+                        ),
+                      ],
+                    ),
+                    const Divider(),
+                    const SizedBox(height: 12),
+
+                    // Name Field
+                    TextFormField(
+                      controller: nameCtrl,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: InputDecoration(
+                        labelText: 'Full Name',
+                        prefixIcon: const Icon(Icons.person_outline),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF2196F3), width: 2),
+                        ),
+                      ),
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Name is required' : null,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Phone Field
+                    TextFormField(
+                      controller: phoneCtrl,
+                      keyboardType: TextInputType.phone,
+                      decoration: InputDecoration(
+                        labelText: 'Phone Number',
+                        prefixIcon: const Icon(Icons.phone_outlined),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF2196F3), width: 2),
+                        ),
+                      ),
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Phone is required' : null,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Address Field
+                    TextFormField(
+                      controller: addressCtrl,
+                      maxLines: 2,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: InputDecoration(
+                        labelText: 'Address',
+                        prefixIcon: const Icon(Icons.location_on_outlined),
+                        alignLabelWithHint: true,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF2196F3), width: 2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Save Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: isSaving ? null : save,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2196F3),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          disabledBackgroundColor: Colors.blue.shade200,
+                        ),
+                        icon: isSaving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.save_rounded),
+                        label: Text(
+                          isSaving ? 'Saving...' : 'Save Changes',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -111,6 +341,14 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
         backgroundColor: const Color(0xFF2196F3),
         elevation: 0,
         foregroundColor: Colors.white,
+        actions: [
+          if (_memberData != null)
+            IconButton(
+              onPressed: _openEditSheet,
+              icon: const Icon(Icons.edit_rounded),
+              tooltip: 'Edit Profile',
+            ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -131,28 +369,38 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Profile Image
-          CircleAvatar(
-            radius: 60,
-            backgroundColor: Colors.blue.shade50,
-            child: (photoUrl != null && photoUrl.toString().isNotEmpty)
-                ? ClipOval(
-                    child: Image.network(
-                      photoUrl,
-                      width: 120,
-                      height: 120,
-                      fit: BoxFit.cover,
-                      loadingBuilder: (context, child, progress) {
-                        if (progress == null) return child;
-                        return const Center(
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.person, size: 60, color: Colors.blue),
-                    ),
-                  )
-                : const Icon(Icons.person, size: 60, color: Colors.blue),
+          // Profile Image — tap to open fullscreen (Telegram style)
+          GestureDetector(
+            onTap: () {
+              if (photoUrl != null && photoUrl.toString().isNotEmpty) {
+                _openImageViewer(context, photoUrl);
+              }
+            },
+            child: Hero(
+              tag: 'member_photo_${widget.memberId}',
+              child: CircleAvatar(
+                radius: 60,
+                backgroundColor: Colors.blue.shade50,
+                child: (photoUrl != null && photoUrl.toString().isNotEmpty)
+                    ? ClipOval(
+                        child: Image.network(
+                          photoUrl,
+                          width: 120,
+                          height: 120,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (context, child, progress) {
+                            if (progress == null) return child;
+                            return const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            );
+                          },
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Icon(Icons.person, size: 60, color: Colors.blue),
+                        ),
+                      )
+                    : const Icon(Icons.person, size: 60, color: Colors.blue),
+              ),
+            ),
           ),
           const SizedBox(height: 16),
 
@@ -316,6 +564,149 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fullscreen Telegram-style Image Viewer
+// ─────────────────────────────────────────────────────────────────────────────
+class _ImageViewerPage extends StatefulWidget {
+  final String imageUrl;
+  final String heroTag;
+  final String memberName;
+
+  const _ImageViewerPage({
+    required this.imageUrl,
+    required this.heroTag,
+    required this.memberName,
+  });
+
+  @override
+  State<_ImageViewerPage> createState() => _ImageViewerPageState();
+}
+
+class _ImageViewerPageState extends State<_ImageViewerPage>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _bgController;
+  late final Animation<double> _bgOpacity;
+  final TransformationController _transformController =
+      TransformationController();
+
+  @override
+  void initState() {
+    super.initState();
+    _bgController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _bgOpacity = CurvedAnimation(parent: _bgController, curve: Curves.easeOut);
+    _bgController.forward();
+  }
+
+  @override
+  void dispose() {
+    _bgController.dispose();
+    _transformController.dispose();
+    super.dispose();
+  }
+
+  void _close() {
+    _bgController.reverse().then((_) {
+      if (mounted) Navigator.of(context).pop();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _close,
+      child: AnimatedBuilder(
+        animation: _bgOpacity,
+        builder: (_, child) => ColoredBox(
+          color: Colors.black.withOpacity(0.92 * _bgOpacity.value),
+          child: child,
+        ),
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: Stack(
+            children: [
+              // ── Zoomable image ──────────────────────────────────────
+              Center(
+                child: Hero(
+                  tag: widget.heroTag,
+                  child: InteractiveViewer(
+                    transformationController: _transformController,
+                    minScale: 0.5,
+                    maxScale: 5.0,
+                    child: Image.network(
+                      widget.imageUrl,
+                      fit: BoxFit.contain,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return const Center(
+                          child: CircularProgressIndicator(color: Colors.white),
+                        );
+                      },
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.broken_image,
+                        size: 80,
+                        color: Colors.white54,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // ── Top bar: close button ───────────────────────────────
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: SafeArea(
+                  child: Row(
+                    children: [
+                      IconButton(
+                        onPressed: _close,
+                        icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                        tooltip: 'Close',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ── Bottom bar: member name ─────────────────────────────
+              if (widget.memberName.isNotEmpty)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [Colors.black87, Colors.transparent],
+                      ),
+                    ),
+                    child: Text(
+                      widget.memberName,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        shadows: [Shadow(blurRadius: 8, color: Colors.black)],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }

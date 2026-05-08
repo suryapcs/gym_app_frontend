@@ -16,4 +16,5 @@ class ApiConstants {
   static const String getMonthlyRevenue = '$baseUrl/get_monthly_revenue.php';
   static const String saveRevenue = '$baseUrl/save_revenue.php';
   static const String expenseHistory = '$baseUrl/get_expense_history.php';
+  static const String updateMember = '$baseUrl/update_member.php';
 }
