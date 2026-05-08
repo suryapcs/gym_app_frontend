@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
 import '../core/api_constants.dart';
 import 'add_payment_screen.dart';
 
@@ -101,6 +102,109 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
     }
   }
 
+  Future<void> _pickAndUploadImage(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: source,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (pickedFile == null) return;
+
+      // Show loading
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Uploading image...')));
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token') ?? '';
+
+      // Read bytes and encode as base64 — no dart:io needed
+      final imageBytes = await pickedFile.readAsBytes();
+      final base64Image = base64Encode(imageBytes);
+      final ext = pickedFile.name.split('.').last.toLowerCase();
+
+      // Send as plain POST with JSON body
+      final response = await http
+          .post(
+            Uri.parse(ApiConstants.updateMember),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json',
+            },
+            body: json.encode({
+              'id': widget.memberId,
+              'name': _memberData!['name'] ?? '',
+              'phone': _memberData!['phone'] ?? '',
+              'address': _memberData!['address'] ?? '',
+              'photo_base64': base64Image,
+              'photo_ext': ext,
+            }),
+          )
+          .timeout(ApiConstants.timeout);
+
+      final data = json.decode(response.body);
+
+      if (data['status'] == 'success') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Profile image updated successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+        _fetchProfileData(); // Refresh to show new image
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('❌ ${data['message'] ?? 'Upload failed'}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  void _showImageSourceDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Change Profile Image'),
+        content: const Text('Choose image source:'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _pickAndUploadImage(ImageSource.camera);
+            },
+            child: const Text('Camera'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _pickAndUploadImage(ImageSource.gallery);
+            },
+            child: const Text('Gallery'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Opens a fullscreen Telegram-style image viewer with Hero animation + pinch-to-zoom.
   void _openImageViewer(BuildContext context, String imageUrl) {
     Navigator.of(context).push(
@@ -125,11 +229,13 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
 
   /// Opens a bottom sheet to edit member details.
   void _openEditSheet() {
-    final nameCtrl    = TextEditingController(text: _memberData!['name'] ?? '');
-    final phoneCtrl   = TextEditingController(text: _memberData!['phone'] ?? '');
-    final addressCtrl = TextEditingController(text: _memberData!['address'] ?? '');
-    final formKey     = GlobalKey<FormState>();
-    bool isSaving     = false;
+    final nameCtrl = TextEditingController(text: _memberData!['name'] ?? '');
+    final phoneCtrl = TextEditingController(text: _memberData!['phone'] ?? '');
+    final addressCtrl = TextEditingController(
+      text: _memberData!['address'] ?? '',
+    );
+    final formKey = GlobalKey<FormState>();
+    bool isSaving = false;
 
     showModalBottomSheet(
       context: context,
@@ -148,19 +254,22 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                 final prefs = await SharedPreferences.getInstance();
                 final token = prefs.getString('token') ?? '';
 
-                final request = http.MultipartRequest(
-                  'POST',
-                  Uri.parse(ApiConstants.updateMember),
-                )
-                  ..headers['Authorization'] = 'Bearer $token'
-                  ..fields['id']      = widget.memberId.toString()
-                  ..fields['name']    = nameCtrl.text.trim()
-                  ..fields['phone']   = phoneCtrl.text.trim()
-                  ..fields['address'] = addressCtrl.text.trim();
+                final request =
+                    http.MultipartRequest(
+                        'POST',
+                        Uri.parse(ApiConstants.updateMember),
+                      )
+                      ..headers['Authorization'] = 'Bearer $token'
+                      ..fields['id'] = widget.memberId.toString()
+                      ..fields['name'] = nameCtrl.text.trim()
+                      ..fields['phone'] = phoneCtrl.text.trim()
+                      ..fields['address'] = addressCtrl.text.trim();
 
-                final streamed = await request.send().timeout(ApiConstants.timeout);
-                final body     = await streamed.stream.bytesToString();
-                final data     = json.decode(body);
+                final streamed = await request.send().timeout(
+                  ApiConstants.timeout,
+                );
+                final body = await streamed.stream.bytesToString();
+                final data = json.decode(body);
 
                 if (!ctx.mounted) return;
 
@@ -184,7 +293,10 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
               } catch (e) {
                 if (ctx.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red,
+                    ),
                   );
                 }
               } finally {
@@ -208,7 +320,10 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                     // Header
                     Row(
                       children: [
-                        const Icon(Icons.edit_rounded, color: Color(0xFF2196F3)),
+                        const Icon(
+                          Icons.edit_rounded,
+                          color: Color(0xFF2196F3),
+                        ),
                         const SizedBox(width: 10),
                         const Text(
                           'Edit Member',
@@ -241,11 +356,15 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFF2196F3), width: 2),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF2196F3),
+                            width: 2,
+                          ),
                         ),
                       ),
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Name is required' : null,
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'Name is required'
+                          : null,
                     ),
                     const SizedBox(height: 16),
 
@@ -261,11 +380,15 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFF2196F3), width: 2),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF2196F3),
+                            width: 2,
+                          ),
                         ),
                       ),
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Phone is required' : null,
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'Phone is required'
+                          : null,
                     ),
                     const SizedBox(height: 16),
 
@@ -283,7 +406,10 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFF2196F3), width: 2),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF2196F3),
+                            width: 2,
+                          ),
                         ),
                       ),
                     ),
@@ -370,37 +496,77 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Profile Image — tap to open fullscreen (Telegram style)
-          GestureDetector(
-            onTap: () {
-              if (photoUrl != null && photoUrl.toString().isNotEmpty) {
-                _openImageViewer(context, photoUrl);
-              }
-            },
-            child: Hero(
-              tag: 'member_photo_${widget.memberId}',
-              child: CircleAvatar(
-                radius: 60,
-                backgroundColor: Colors.blue.shade50,
-                child: (photoUrl != null && photoUrl.toString().isNotEmpty)
-                    ? ClipOval(
-                        child: Image.network(
-                          photoUrl,
-                          width: 120,
-                          height: 120,
-                          fit: BoxFit.cover,
-                          loadingBuilder: (context, child, progress) {
-                            if (progress == null) return child;
-                            return const Center(
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            );
-                          },
-                          errorBuilder: (context, error, stackTrace) =>
-                              const Icon(Icons.person, size: 60, color: Colors.blue),
-                        ),
-                      )
-                    : const Icon(Icons.person, size: 60, color: Colors.blue),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              GestureDetector(
+                onTap: () {
+                  if (photoUrl != null && photoUrl.toString().isNotEmpty) {
+                    _openImageViewer(context, photoUrl);
+                  }
+                },
+                child: Hero(
+                  tag: 'member_photo_${widget.memberId}',
+                  child: CircleAvatar(
+                    radius: 60,
+                    backgroundColor: Colors.blue.shade50,
+                    child: (photoUrl != null && photoUrl.toString().isNotEmpty)
+                        ? ClipOval(
+                            child: Image.network(
+                              photoUrl,
+                              width: 120,
+                              height: 120,
+                              fit: BoxFit.cover,
+                              loadingBuilder: (context, child, progress) {
+                                if (progress == null) return child;
+                                return const Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                );
+                              },
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const Icon(
+                                    Icons.person,
+                                    size: 60,
+                                    color: Colors.blue,
+                                  ),
+                            ),
+                          )
+                        : const Icon(
+                            Icons.person,
+                            size: 60,
+                            color: Colors.blue,
+                          ),
+                  ),
+                ),
               ),
-            ),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2196F3),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  child: IconButton(
+                    onPressed: _showImageSourceDialog,
+                    icon: const Icon(
+                      Icons.camera_alt,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    tooltip: 'Change Profile Image',
+                    constraints: const BoxConstraints(
+                      minWidth: 40,
+                      minHeight: 40,
+                    ),
+                    padding: EdgeInsets.zero,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
 
@@ -669,7 +835,11 @@ class _ImageViewerPageState extends State<_ImageViewerPage>
                     children: [
                       IconButton(
                         onPressed: _close,
-                        icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                        icon: const Icon(
+                          Icons.close,
+                          color: Colors.white,
+                          size: 28,
+                        ),
                         tooltip: 'Close',
                       ),
                     ],
